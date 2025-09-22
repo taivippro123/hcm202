@@ -1,0 +1,207 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@100..900&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+#root::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: var(--app-bg-image, url('/textures/background.jpg'));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  z-index: -1;
+}
+
+/* Video background support */
+#root::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: var(--app-bg-video, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  z-index: -2;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+}
+
+/* Mobile responsive improvements */
+@media (max-width: 768px) {
+  #root {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  body {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+  }
+  
+  /* Prevent horizontal scroll on mobile */
+  * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  
+  /* Mobile-specific text improvements */
+  h1, h2, h3, h4, h5, h6 {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+  
+  p, span, div {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  /* Mobile navigation improvements */
+  .mobile-nav {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  
+  .mobile-nav button {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+/* Mobile content panel improvements */
+@media (max-width: 768px) {
+  .page-content-mobile {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    left: 0 !important;
+    padding: 1rem !important;
+  }
+  
+  .page-content-mobile h2 {
+    font-size: 1.5rem !important;
+    line-height: 1.3 !important;
+  }
+  
+  .page-content-mobile p {
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+  }
+  
+  /* Mobile layout: sách ở trên, content ở dưới */
+  .mobile-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  
+  .mobile-book-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 2rem;
+  }
+  
+  .mobile-content-area {
+    height: 50vh;
+    background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.5));
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  
+  /* Mobile navigation improvements */
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(10px);
+    padding: 0.5rem;
+    z-index: 20;
+  }
+  
+  .mobile-nav-buttons {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    padding: 0.25rem;
+  }
+  
+  .mobile-nav-buttons button {
+    min-width: 60px;
+    min-height: 40px;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    white-space: nowrap;
+  }
+}
+
+.outline-text {
+  -webkit-text-stroke: 1px white;
+}
+
+/* Ẩn thanh cuộn nhưng vẫn có thể cuộn */
+.scrollbar-hide {
+  /* Firefox */
+  scrollbar-width: none;
+  /* Safari and Chrome */
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Đảm bảo scroll hoạt động trên mobile */
+.mobile-scroll-container {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  touch-action: pan-y;
+}
+
+/* Fix cho iOS Safari */
+@supports (-webkit-touch-callout: none) {
+  .mobile-scroll-container {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Force scroll to work */
+.mobile-scroll-container * {
+  pointer-events: auto;
+}
+
