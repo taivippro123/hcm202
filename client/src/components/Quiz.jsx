@@ -7,10 +7,18 @@ export const Quiz = ({ open, onClose }) => {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [hasCachedQuiz, setHasCachedQuiz] = useState(false);
 
   useEffect(() => {
     const fetchQuiz = async () => {
       if (!open) return;
+      
+      // Nếu đã có quiz cached và chưa submit, không cần gọi API
+      if (hasCachedQuiz && questions.length > 0 && !submitted) {
+        setLoading(false);
+        return;
+      }
+      
       setSubmitted(false);
       setAnswers({});
       setLoading(true);
@@ -29,6 +37,7 @@ export const Quiz = ({ open, onClose }) => {
         }
         if (!Array.isArray(data) || data.length === 0) throw new Error("Không lấy được câu hỏi");
         setQuestions(data);
+        setHasCachedQuiz(true);
       } catch (e) {
         if (e.message === "quota_exceeded") {
           setError("Dự án sử dụng API miễn phí nên đã hết lượt yêu cầu, vui lòng thử lại sau");
@@ -40,7 +49,7 @@ export const Quiz = ({ open, onClose }) => {
       }
     };
     fetchQuiz();
-  }, [open]);
+  }, [open, hasCachedQuiz, questions.length, submitted]);
 
   if (!open) return null;
 
@@ -52,9 +61,10 @@ export const Quiz = ({ open, onClose }) => {
 
   const submit = () => setSubmitted(true);
   const reload = () => {
-    // trigger re-fetch by toggling open: just close and reopen via parent or call fetch here
+    // Reset cache và tải quiz mới
     setSubmitted(false);
     setAnswers({});
+    setHasCachedQuiz(false);
     setLoading(true);
     setError("");
     fetch(`${API_URL}/quiz`, { method: "POST" })
@@ -72,6 +82,7 @@ export const Quiz = ({ open, onClose }) => {
           throw new Error("quota_exceeded");
         }
         setQuestions(Array.isArray(data) ? data : []);
+        setHasCachedQuiz(true);
       })
       .catch((e) => {
         if (e.message === "quota_exceeded") {
@@ -89,7 +100,18 @@ export const Quiz = ({ open, onClose }) => {
       <div className="relative w-[92vw] max-w-[720px] bg-gradient-to-b from-black/80 to-black/60 border border-white/20 rounded-2xl backdrop-blur-xl p-4 md:p-6 text-white">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold">Mini Quiz</h3>
-          <button className="text-white/80 hover:text-white" onClick={onClose}>✕</button>
+          <div className="flex items-center gap-2">
+            {hasCachedQuiz && !submitted && (
+              <button 
+                className="text-xs px-2 py-1 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                onClick={reload}
+                disabled={loading}
+              >
+                {loading ? "Đang tải..." : "Tải mới"}
+              </button>
+            )}
+            <button className="text-white/80 hover:text-white" onClick={onClose}>✕</button>
+          </div>
         </div>
         {error && <div className="mb-2 text-xs text-red-300">{error}</div>}
         {loading ? (
