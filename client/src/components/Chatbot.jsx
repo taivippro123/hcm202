@@ -45,13 +45,26 @@ export const Chatbot = ({ open, onClose }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: text }),
       });
-      if (!res.ok) throw new Error("Yêu cầu thất bại");
+      if (!res.ok) {
+        if (res.status === 429) {
+          throw new Error("quota_exceeded");
+        }
+        throw new Error("Yêu cầu thất bại");
+      }
       const data = await res.json();
+      if (data.error && data.error.includes("quota")) {
+        throw new Error("quota_exceeded");
+      }
       const answer = data?.answer || "Không tìm thấy trong giáo trình";
       setMessages((prev) => [...prev, { role: "assistant", content: answer }]);
     } catch (e) {
-      setError("Có lỗi khi gọi API. Vui lòng thử lại.");
-      setMessages((prev) => [...prev, { role: "assistant", content: "Xin lỗi, có lỗi xảy ra." }]);
+      if (e.message === "quota_exceeded") {
+        setError("Dự án sử dụng API miễn phí nên đã hết lượt yêu cầu, vui lòng thử lại sau");
+        setMessages((prev) => [...prev, { role: "assistant", content: "Dự án sử dụng API miễn phí nên đã hết lượt yêu cầu, vui lòng thử lại sau" }]);
+      } else {
+        setError("Có lỗi khi gọi API. Vui lòng thử lại.");
+        setMessages((prev) => [...prev, { role: "assistant", content: "Xin lỗi, có lỗi xảy ra." }]);
+      }
     } finally {
       setLoading(false);
     }

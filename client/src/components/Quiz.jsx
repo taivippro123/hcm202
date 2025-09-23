@@ -17,12 +17,24 @@ export const Quiz = ({ open, onClose }) => {
       setError("");
       try {
         const res = await fetch(`${API_URL}/quiz`, { method: "POST" });
-        if (!res.ok) throw new Error("Yêu cầu thất bại");
+        if (!res.ok) {
+          if (res.status === 429) {
+            throw new Error("quota_exceeded");
+          }
+          throw new Error("Yêu cầu thất bại");
+        }
         const data = await res.json();
+        if (data.error && data.error.includes("quota")) {
+          throw new Error("quota_exceeded");
+        }
         if (!Array.isArray(data) || data.length === 0) throw new Error("Không lấy được câu hỏi");
         setQuestions(data);
       } catch (e) {
-        setError("Có lỗi khi tải câu hỏi. Vui lòng thử lại.");
+        if (e.message === "quota_exceeded") {
+          setError("Dự án sử dụng API miễn phí nên đã hết lượt yêu cầu, vui lòng thử lại sau");
+        } else {
+          setError("Có lỗi khi tải câu hỏi. Vui lòng thử lại.");
+        }
       } finally {
         setLoading(false);
       }
@@ -46,11 +58,28 @@ export const Quiz = ({ open, onClose }) => {
     setLoading(true);
     setError("");
     fetch(`${API_URL}/quiz`, { method: "POST" })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) {
+          if (res.status === 429) {
+            throw new Error("quota_exceeded");
+          }
+          throw new Error("Yêu cầu thất bại");
+        }
+        return res.json();
+      })
       .then(data => {
+        if (data.error && data.error.includes("quota")) {
+          throw new Error("quota_exceeded");
+        }
         setQuestions(Array.isArray(data) ? data : []);
       })
-      .catch(() => setError("Có lỗi khi tải câu hỏi. Vui lòng thử lại."))
+      .catch((e) => {
+        if (e.message === "quota_exceeded") {
+          setError("Dự án sử dụng API miễn phí nên đã hết lượt yêu cầu, vui lòng thử lại sau");
+        } else {
+          setError("Có lỗi khi tải câu hỏi. Vui lòng thử lại.");
+        }
+      })
       .finally(() => setLoading(false));
   };
 
