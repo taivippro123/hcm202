@@ -85,6 +85,13 @@ app.post("/chat", async (req, res) => {
         const result = await model.generateContent(prompt);
         res.json({ answer: result.response.text() });
     } catch (err) {
+        console.error("Chat endpoint error:", err.message);
+        if (err.message.includes("429") || err.message.includes("quota")) {
+            return res.status(429).json({ 
+                error: "API quota exceeded. Please try again later or upgrade your plan.",
+                retryAfter: 3600 // 1 hour
+            });
+        }
         res.status(500).json({ error: err.message });
     }
 });
@@ -133,6 +140,13 @@ app.post("/quiz", async (req, res) => {
 
         return res.json(normalized);
     } catch (err) {
+        console.error("Quiz endpoint error:", err.message);
+        if (err.message.includes("429") || err.message.includes("quota")) {
+            return res.status(429).json({ 
+                error: "API quota exceeded. Please try again later or upgrade your plan.",
+                retryAfter: 3600 // 1 hour
+            });
+        }
         res.status(500).json({ error: err.message });
     }
 });
