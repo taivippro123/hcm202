@@ -12,15 +12,13 @@ export const Quiz = ({ open, onClose }) => {
   useEffect(() => {
     const fetchQuiz = async () => {
       if (!open) return;
-      
-      // Nếu đã có quiz cached và chưa submit, không cần gọi API
-      if (hasCachedQuiz && questions.length > 0 && !submitted) {
+
+      // Nếu đã có quiz cached, không cần gọi API lại
+      if (hasCachedQuiz) {
         setLoading(false);
         return;
       }
-      
-      setSubmitted(false);
-      setAnswers({});
+
       setLoading(true);
       setError("");
       try {
@@ -49,7 +47,7 @@ export const Quiz = ({ open, onClose }) => {
       }
     };
     fetchQuiz();
-  }, [open, hasCachedQuiz, questions.length, submitted]);
+  }, [open, hasCachedQuiz]);
 
   if (!open) return null;
 
