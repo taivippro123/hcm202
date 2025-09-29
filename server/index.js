@@ -89,8 +89,30 @@ app.post("/chat", async (req, res) => {
         const { question } = req.body;
 
         // Tìm đoạn liên quan
-        const pieces = findRelevantChunks(question, 5);
-        const context = pieces.join("\n\n---\n\n");
+        const pieces = findRelevantChunks(question, 10).filter(Boolean);
+        let context = pieces.join("\n\n---\n\n");
+
+        // Fallback: nếu không tìm thấy trong chunks, thử dùng ngân hàng quiz để hỗ trợ ngữ cảnh
+        if (!context && Array.isArray(quizBank) && quizBank.length > 0) {
+            // Chọn 10 câu hỏi trong quiz gần với câu hỏi của user
+            const tokens = tokenize(question);
+            const scored = quizBank
+                .map((q) => ({
+                    q,
+                    score: scoreChunk(tokens, `${q.question}\n${Array.isArray(q.options) ? q.options.join(" ") : ""}`),
+                }))
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 10)
+                .map((x) => x.q)
+                .filter((x) => x && typeof x.question === "string");
+
+            if (scored.length > 0) {
+                const quizContext = scored
+                    .map((q, idx) => `Q${idx + 1}: ${q.question}\nOptions: ${(q.options || []).join(" | ")}\nAnswer: ${q.answer}`)
+                    .join("\n\n---\n\n");
+                context = `Tư liệu tham khảo từ ngân hàng câu hỏi:\n\n${quizContext}`;
+            }
+        }
 
         if (!context) {
             return res.json({ answer: "Không tìm thấy trong giáo trình" });
