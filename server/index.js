@@ -12,7 +12,7 @@ app.use(bodyParser.json());
 
 // 🔑 API Key Gemini (set bằng: export GEMINI_API_KEY="xxxx")
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // 📂 Load chunks.json (robust path)
 let chunks = [];
@@ -26,6 +26,23 @@ try {
     }
 } catch (e) {
     chunks = [];
+}
+
+// 📚 Load quiz bank from quiz.json (robust path)
+let quizBank = [];
+try {
+    const byCwd = path.join(process.cwd(), "server", "quiz.json");
+    const byLocal = path.join(process.cwd(), "quiz.json");
+    const quizPath = fs.existsSync(byCwd) ? byCwd : byLocal;
+    const raw = fs.readFileSync(quizPath, "utf8");
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+        quizBank = parsed;
+    } else if (Array.isArray(parsed?.questions)) {
+        quizBank = parsed.questions;
+    }
+} catch (e) {
+    quizBank = [];
 }
 
 // 🔎 Tìm chunk liên quan (chấm điểm theo từ khóa, có fallback)
@@ -96,58 +113,29 @@ app.post("/chat", async (req, res) => {
     }
 });
 
-// 📌 Endpoint Quiz (1 câu hỏi, 4 đáp án)
-app.post("/quiz", async (req, res) => {
+// 📌 Endpoint Quiz: lấy ngẫu nhiên 10 câu từ quiz.json, không gọi AI
+app.post("/quiz", async (_req, res) => {
     try {
-        if (!Array.isArray(chunks) || chunks.length === 0) {
-            return res.status(400).json({ error: "Không có dữ liệu giáo trình (chunks.json)" });
+        if (!Array.isArray(quizBank) || quizBank.length < 4) {
+            return res.status(400).json({ error: "Không có dữ liệu quiz (quiz.json)" });
         }
-
-        // Lấy ngẫu nhiên một tập các đoạn làm ngữ cảnh
-        const take = Math.min(30, chunks.length);
-        const shuffled = [...chunks].sort(() => Math.random() - 0.5);
-        const context = shuffled.slice(0, take).join("\n\n---\n\n");
-
-        const prompt = `Bạn là hệ thống tạo đề trắc nghiệm. Chỉ dựa trên phần TÀI LIỆU sau đây, hãy tạo RA DANH SÁCH 10 câu hỏi trắc nghiệm, mỗi câu có 4 lựa chọn và đúng 1 đáp án.\n\nYÊU CẦU ĐẦU RA: Trả về DUY NHẤT một mảng JSON gồm 10 phần tử, MỖI PHẦN TỬ có đúng các trường sau:\n- question: string\n- options: array gồm đúng 4 string\n- answer: một trong các ký tự \"A\", \"B\", \"C\", \"D\" (đáp án đúng)\n\nKHÔNG VIẾT THÊM CHÚ THÍCH, VĂN BẢN BÊN NGOÀI JSON.\n\nTÀI LIỆU:\n${context}\n`;
-
-        const result = await model.generateContent(prompt);
-        const text = result.response.text();
-
-        // Cố gắng trích xuất mảng JSON
-        let quizList = null;
-        try {
-            const arrayMatch = text.match(/\[[\s\S]*\]/);
-            if (arrayMatch) {
-                quizList = JSON.parse(arrayMatch[0]);
-            } else {
-                // Thử parse toàn bộ
-                quizList = JSON.parse(text);
-            }
-        } catch (_) {
-            quizList = null;
+        const pool = [...quizBank];
+        // shuffle Fisher–Yates
+        for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pool[i], pool[j]] = [pool[j], pool[i]];
         }
-
-        // Validate sơ bộ
-        if (!Array.isArray(quizList) || quizList.length !== 10) {
-            return res.json({ error: "Không tạo được danh sách 10 câu hỏi" });
-        }
-
-        const normalized = quizList.map((q) => ({
+        const take = Math.min(10, pool.length);
+        const picked = pool.slice(0, take);
+        const normalized = picked.map((q) => ({
             question: String(q.question || "").trim(),
-            options: Array.isArray(q.options) ? q.options.slice(0,4).map(o => String(o)) : [],
+            options: Array.isArray(q.options) ? q.options.slice(0, 4).map((o) => String(o)) : [],
             answer: typeof q.answer === "string" ? q.answer.trim().toUpperCase() : ""
         }));
-
         return res.json(normalized);
     } catch (err) {
-        console.error("Quiz endpoint error:", err.message);
-        if (err.message.includes("429") || err.message.includes("quota")) {
-            return res.status(429).json({ 
-                error: "API quota exceeded. Please try again later or upgrade your plan.",
-                retryAfter: 3600 // 1 hour
-            });
-        }
-        res.status(500).json({ error: err.message });
+        console.error("Quiz endpoint error:", err?.message || err);
+        return res.status(500).json({ error: "Quiz service failed" });
     }
 });
 

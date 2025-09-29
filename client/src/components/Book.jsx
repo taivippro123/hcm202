@@ -67,21 +67,33 @@ pageGeometry.setAttribute(
   new Float32BufferAttribute(skinWeights, 4)
 );
 
-const whiteColor = new Color("white");
+const whiteColor = new Color("#eeeeee");
 // const emissiveColor = new Color("green");
 
 const pageMaterials = [
   new MeshStandardMaterial({
     color: whiteColor,
+    roughness: 0.9,
+    metalness: 0,
+    envMapIntensity: 0.4,
   }),
   new MeshStandardMaterial({
     color: "#111",
+    roughness: 1,
+    metalness: 0,
+    envMapIntensity: 0.2,
   }),
   new MeshStandardMaterial({
     color: whiteColor,
+    roughness: 0.9,
+    metalness: 0,
+    envMapIntensity: 0.4,
   }),
   new MeshStandardMaterial({
     color: whiteColor,
+    roughness: 0.9,
+    metalness: 0,
+    envMapIntensity: 0.4,
   }),
 ];
 
@@ -131,14 +143,18 @@ const Page = ({ number, front, back, page, opened, bookClosed, ...props }) => {
       new MeshStandardMaterial({
         color: whiteColor,
         map: picture,
-        roughness: 1,
+        roughness: 0.95,
         metalness: 0,
+        envMapIntensity: 0.5,
+        emissiveIntensity: 0,
       }),
       new MeshStandardMaterial({
         color: whiteColor,
         map: picture2,
-        roughness: 1,
+        roughness: 0.95,
         metalness: 0,
+        envMapIntensity: 0.5,
+        emissiveIntensity: 0,
       }),
     ];
     const mesh = new SkinnedMesh(pageGeometry, materials);

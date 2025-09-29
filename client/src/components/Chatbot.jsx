@@ -17,7 +17,7 @@ const ChatMessage = ({ role, content }) => {
 
 export const Chatbot = ({ open, onClose }) => {
   const [messages, setMessages] = useState([
-    { role: "assistant", content: "Xin chào! Tôi có thể giúp gì cho bạn?" },
+    { role: "assistant", content: "Xin chào! Tôi là AI chatbot về môn học tư tưởng Hồ Chí Minh, tôi có thể giúp gì cho bạn?" },
   ]);
   const [input, setInput] = useState("");
   const listRef = useRef();

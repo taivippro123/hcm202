@@ -23,16 +23,20 @@ export const Experience = () => {
       const fovRad = (camera.fov * Math.PI) / 180;
       const worldWidthAtTarget = 2 * Math.tan(fovRad / 2) * distance * camera.aspect;
       const panelFrac = 0.30; // panel phải 30%
-      const bias = isMobile ? 0.02 : -0.03; // đẩy lệch trái thêm một chút để tránh chạm panel
+      const bias = isMobile ? 0.02 : -0.08; // đẩy lệch trái hơn để lộ trang phải
       const leftCenterOffsetX = -(panelFrac / 2 + bias) * worldWidthAtTarget;
 
       const desiredBookX = bookOpen ? leftCenterOffsetX : 0;
+      // Khi mở nội dung: dời trục (target) của OrbitControls lệch trái thêm một chút
+      const targetBiasFrac = isMobile ? 0.00 : -0.20; //~20% bề rộng thế giới tại target
+      const desiredTargetX = bookOpen
+        ? leftCenterOffsetX - targetBiasFrac * worldWidthAtTarget
+        : 0;
       if (bookGroupRef.current) {
         bookGroupRef.current.position.x += (desiredBookX - bookGroupRef.current.position.x) * Math.min(1, delta * 3);
       }
 
-      const bookX = bookGroupRef.current ? bookGroupRef.current.position.x : desiredBookX;
-      const target = new Vector3(bookX, 0, 0);
+      const target = new Vector3(desiredTargetX, 0, 0);
       controlsRef.current.target.lerp(target, Math.min(1, delta * 3));
       controlsRef.current.update();
     }
