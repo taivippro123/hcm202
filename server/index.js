@@ -10,9 +10,42 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// 🔑 API Key Gemini (set bằng: export GEMINI_API_KEY="xxxx")
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+// 🔑 Load multiple API Keys for load balancing
+const apiKeys = [
+    process.env.GEMINI_API_KEY_1,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+    process.env.GEMINI_API_KEY_4,
+    process.env.GEMINI_API_KEY_5,
+    process.env.GEMINI_API_KEY_6
+].filter(key => key && key.trim() !== ''); // Filter out empty/undefined keys
+
+if (apiKeys.length === 0) {
+    console.error("❌ No valid API keys found! Please set at least one GEMINI_API_KEY_X");
+    process.exit(1);
+}
+
+console.log(`✅ Loaded ${apiKeys.length} API keys for load balancing`);
+
+// Round-robin counter for even distribution
+let currentKeyIndex = 0;
+
+// 🔄 Key selection strategies
+function getRandomKey() {
+    return apiKeys[Math.floor(Math.random() * apiKeys.length)];
+}
+
+function getRoundRobinKey() {
+    const key = apiKeys[currentKeyIndex];
+    currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+    return key;
+}
+
+// 🎯 Get AI model instance with selected key
+function getAIModel(key) {
+    const genAI = new GoogleGenerativeAI(key);
+    return genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+}
 
 // 📂 Load chunks.json (robust path)
 let chunks = [];
@@ -83,56 +116,86 @@ function findRelevantChunks(question, limit = 5) {
     return scored.sort((a,b) => b.score - a.score).slice(0, limit).map(x => x.c);
 }
 
-// 📌 Endpoint Chatbot
+// 📌 Endpoint Chatbot with load balancing
 app.post("/chat", async (req, res) => {
-    try {
-        const { question } = req.body;
+    const { question } = req.body;
+    let lastError = null;
 
-        // Tìm đoạn liên quan
-        const pieces = findRelevantChunks(question, 10).filter(Boolean);
-        let context = pieces.join("\n\n---\n\n");
+    // Try each API key until one succeeds
+    for (let attempt = 0; attempt < apiKeys.length; attempt++) {
+        try {
+            // Use round-robin for even distribution, fallback to random if needed
+            const selectedKey = getRoundRobinKey();
+            const model = getAIModel(selectedKey);
+            
+            console.log(`🔄 Using API key ${attempt + 1}/${apiKeys.length} for chat request`);
 
-        // Fallback: nếu không tìm thấy trong chunks, thử dùng ngân hàng quiz để hỗ trợ ngữ cảnh
-        if (!context && Array.isArray(quizBank) && quizBank.length > 0) {
-            // Chọn 10 câu hỏi trong quiz gần với câu hỏi của user
-            const tokens = tokenize(question);
-            const scored = quizBank
-                .map((q) => ({
-                    q,
-                    score: scoreChunk(tokens, `${q.question}\n${Array.isArray(q.options) ? q.options.join(" ") : ""}`),
-                }))
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 10)
-                .map((x) => x.q)
-                .filter((x) => x && typeof x.question === "string");
+            // Tìm đoạn liên quan
+            const pieces = findRelevantChunks(question, 10).filter(Boolean);
+            let context = pieces.join("\n\n---\n\n");
 
-            if (scored.length > 0) {
-                const quizContext = scored
-                    .map((q, idx) => `Q${idx + 1}: ${q.question}\nOptions: ${(q.options || []).join(" | ")}\nAnswer: ${q.answer}`)
-                    .join("\n\n---\n\n");
-                context = `Tư liệu tham khảo từ ngân hàng câu hỏi:\n\n${quizContext}`;
+            // Fallback: nếu không tìm thấy trong chunks, thử dùng ngân hàng quiz để hỗ trợ ngữ cảnh
+            if (!context && Array.isArray(quizBank) && quizBank.length > 0) {
+                // Chọn 10 câu hỏi trong quiz gần với câu hỏi của user
+                const tokens = tokenize(question);
+                const scored = quizBank
+                    .map((q) => ({
+                        q,
+                        score: scoreChunk(tokens, `${q.question}\n${Array.isArray(q.options) ? q.options.join(" ") : ""}`),
+                    }))
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 10)
+                    .map((x) => x.q)
+                    .filter((x) => x && typeof x.question === "string");
+
+                if (scored.length > 0) {
+                    const quizContext = scored
+                        .map((q, idx) => `Q${idx + 1}: ${q.question}\nOptions: ${(q.options || []).join(" | ")}\nAnswer: ${q.answer}`)
+                        .join("\n\n---\n\n");
+                    context = `Tư liệu tham khảo từ ngân hàng câu hỏi:\n\n${quizContext}`;
+                }
+            }
+
+            if (!context) {
+                return res.json({ answer: "Không tìm thấy trong giáo trình" });
+            }
+
+            const prompt = `Bạn là trợ lý chỉ được phép dùng thông tin trong phần TÀI LIỆU dưới đây.\nNếu câu trả lời không nằm trong TÀI LIỆU, hãy trả lời đúng 1 câu: \"Không tìm thấy trong giáo trình\".\n\nTÀI LIỆU:\n${context}\n\nCÂU HỎI:\n${question}\n\nTRẢ LỜI (chỉ dựa trên TÀI LIỆU):`;
+            
+            const result = await model.generateContent(prompt);
+            console.log(`✅ Chat request successful with API key ${attempt + 1}`);
+            return res.json({ answer: result.response.text() });
+
+        } catch (err) {
+            lastError = err;
+            console.error(`❌ API key ${attempt + 1} failed:`, err.message);
+            
+            // If it's a quota error, try next key immediately
+            if (err.message.includes("429") || err.message.includes("quota")) {
+                console.log(`🔄 Quota exceeded for key ${attempt + 1}, trying next key...`);
+                continue;
+            }
+            
+            // For other errors, also try next key
+            if (attempt < apiKeys.length - 1) {
+                console.log(`🔄 Error with key ${attempt + 1}, trying next key...`);
+                continue;
             }
         }
-
-        if (!context) {
-            return res.json({ answer: "Không tìm thấy trong giáo trình" });
-        }
-
-        const prompt = `Bạn là trợ lý chỉ được phép dùng thông tin trong phần TÀI LIỆU dưới đây.\nNếu câu trả lời không nằm trong TÀI LIỆU, hãy trả lời đúng 1 câu: \"Không tìm thấy trong giáo trình\".\n\nTÀI LIỆU:\n${context}\n\nCÂU HỎI:\n${question}\n\nTRẢ LỜI (chỉ dựa trên TÀI LIỆU):`;
-        
-
-        const result = await model.generateContent(prompt);
-        res.json({ answer: result.response.text() });
-    } catch (err) {
-        console.error("Chat endpoint error:", err.message);
-        if (err.message.includes("429") || err.message.includes("quota")) {
-            return res.status(429).json({ 
-                error: "API quota exceeded. Please try again later or upgrade your plan.",
-                retryAfter: 3600 // 1 hour
-            });
-        }
-        res.status(500).json({ error: err.message });
     }
+
+    // All keys failed
+    console.error("❌ All API keys failed");
+    if (lastError && (lastError.message.includes("429") || lastError.message.includes("quota"))) {
+        return res.status(429).json({ 
+            error: "All API quotas exceeded. Please try again later.",
+            retryAfter: 3600 // 1 hour
+        });
+    }
+    
+    return res.status(500).json({ 
+        error: lastError ? lastError.message : "All API keys failed" 
+    });
 });
 
 // 📌 Endpoint Quiz: lấy ngẫu nhiên 10 câu từ quiz.json, không gọi AI
